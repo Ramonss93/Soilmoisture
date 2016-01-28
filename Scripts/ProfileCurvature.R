@@ -1,10 +1,7 @@
-# profile curvature
-source('Scripts/DEMderiv_blog.r')
-profileCurv <- DEMderiv(DEM, "prof.curvature", "evans")
-
 DEMderiv<-function(data,attr,method){
 	#Title: Function for computing terrain attributes from a raster
-	#Author: Fabio Veronesi
+	#args: data(rasterDEM0, attr(string with prof.curv), method=evans)
+  #Author: Fabio Veronesi
 	#License: Creative Commons - Attribution-NonCommercial (CC BY-NC) - http://creativecommons.org/
 	
 	cellValue=res(data)[1]
@@ -33,7 +30,5 @@ DEMderiv<-function(data,attr,method){
 	c(result)
 }
 
-
-# use it to remove erroneous curvature values
-#kp=scalar(if(catchment==1 then kp else 0.0));
+cellValue=res(data)[1]
 

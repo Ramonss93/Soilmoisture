@@ -1,60 +1,53 @@
+#Droesen geo-solutions
+#Jan Droesen
+#28/01/2016
 
+### Title: Script for downscaling soil moisture based on a Digital elevation model
 
-#libraries
-library(dynatopmodel)
+### Libraries
 library(raster)
 library(rgdal)
 library(sp)
+library(graphics)
 
+# Remove items from list
 rm(list = ls())
 
-setwd("/home/user/git/ScriptingProject")
-
-#Title: Scripting for digital terrain modelling
-
-#Documentation: Must, Should, Could, Would
-#Must: get an soil water content map for one catchment, nicely visualized (maybe some mozaiking)
-
-#Should: compare the estimated values of soil moisture with actual soil moisture data (point measurements) and uncertainty map, e.g. with R squared
-	
-#Could: use for hydrological models
-	
-#Would: script for every digital elevation model and all raster/vector datasets
+# Set working directory
+path = "C:/Users/gebruiker/Documents/Downscaling_script/"
+setwd(path)
 
 
-#import DEM
+### User requirements (go through these steps):
+      # 1. Should import a DEM (in this script two DEM's are given as example (uncomment one to see results))
+      # 2. If projection DEM is unknown, give projection in format proj4
+      # 3. Give soil moisture data (raster or points), three examples or given (uncomment one to see results)
+      # 4. Last value to be set is the flow accumulation
+      # 5. As R does not have a function for profile curvature choose one of the two examples
+      
 
-##import and preprocess data raster/vector
+#1. import DEM
+DEM <- raster('data/tarrawar.asc')
+#DEM <- raster('data/dem5wuest.asc')
 
-## what I ask from user: DEM, projection if not known, soil moisture dataset (POINT OR RASTER), idem dito, slopy area
-# rastertest 1
-DEM <- raster('data/dem5wuest.asc')
-#change if different
+
+#if projection is unknown, set here projection
 prj_string <- "+proj=tmerc +lat_0=0 +lon_0=6 +k=1 +x_0=2500000 +y_0=0 +ellps=bessel +datum=potsdam +units=m +no_defs +towgs84=598.1,73.7,418.2,0.202,0.045,-2.455,6.7"
-#raster test 2
-#DEM <- raster('data/tarrawar.asc')
 source('Scripts/projection.R')
 DEM <- projectinput(DEM, prj_string)
 
-#points SM at a certain time (in certain format), three examples with fields X, Y, SM)
-SoilMoistureDataFrame <- read.csv('data/Wuest_all_mod.csv')
-SoilMoistureDataFrame <- read.csv('data/SM_points_all.csv')
-rasterSM <-  raster('data/MC-20130506-SM.tif')
-rasterSM <- projectRaster(rasterSM, crs=prj_string)
-#preprocess soil moisture
-rastercrop <- crop(rasterSMproj, DEM)
+plot(DEM, main="Digital elevation model", col=topo.colors(255))
 
-#steps for soil moisture dataset?
+# 3. Soil moisture data (raster or points)
+SoilMoistureDataSet <- read.csv('data/SoilMoisturetarra.csv')
+#SoilMoistureDataSet <- read.csv('data/SoilMoistureWuest.csv', sep=",")
+#SoilMoistureDataSet <-  projectRaster(raster('data/MC-20130429-SM.tif'),crs=prj_string)
 
-
-#mask for catchment
-
-#EXTENTS?
-DEM
-##relative length to channel
+# 4. relative distance to channel
 source('Scripts/ChannelNetwork.R')
-lrel <- HydroNetwork(DEM, 40000)
-plot(lrel)
+accumulationvalue <- 15000 #give here the specified accumulation for a stream
+lrel <- HydroNetwork(DEM, accumulationvalue)
+
 # aspect map
 aspect <- terrain(DEM, opt='aspect', unit='degrees', neighbors = 8)
 
@@ -62,68 +55,69 @@ aspect <- terrain(DEM, opt='aspect', unit='degrees', neighbors = 8)
 slope <- terrain(DEM, opt='slope', unit='degrees', neighbors = 8)
 
 # profile curvature
-profileCurv <-  raster('data/Wuest_prcurv.tif')
-#profileCurv <-  raster('data/Tar_profcurv.tif')
-plot(profileCurv)
+profileCurv <-  raster('data/Tar_profcurv.tif')
+#profileCurv <-  raster('data/Wuest_prcurv.tif')
+#not working function for profile curvature:
+#source('Scripts/ProfileCurvature.R')
+#profileCurv <- DEMderiv(DEM, "prof.curvature", "evans")
 
-#plot terrain attributes
 
-#visualize aspect
-par(mfrow = (c(1,1)))
-colors <- c("lightblue","darkblue","black","white")
+
+### plot terrain attributes
+
+# visualize aspect
+par(mfrow = (c(2,2)))
+colors <- c("lightblue","darkblue","blue","lightcyan4")
 labels=c("North","East","South","West")
 plot(aspect, col=colors, legend=labels, main="Aspect")
 legend("bottomright", fill=colors,legend=labels, title="Legend")
 
-#visualize distance to channel
+# visualize distance to channel
 colfunc <- colorRampPalette(c("darkblue", "white"))
 plot(lrel, col=colfunc(10), main="Distance to channel")
 
-#visualize slope
+# visualize slope
 colfunc <- colorRampPalette(c("green","yellow", "red"))
 plot(slope, col=colfunc(255), main="Slope")
 
-#visualize profile curvature
+# visualize profile curvature
 colfunc <- colorRampPalette(c("white","black"))
 plot(profileCurv, col=colfunc(255),main="Profile curvature")
 
-## Svetlitchnyi's functie
 
 
-# north or southern hemisphere
+### Svetlitchnyi's function
 
-# find convex, concave cells
 source('Scripts/WeightingRaster.R')
 Weighting <- getWeightingRaster(aspect, slope, profileCurv, lrel)
-plot(Weighting)
 
 source('Scripts/GetSWC.R')
-SM <- getSoilMoistureContent(SoilMoistureDataFrame, Weighting)
-writeRaster(SM, 'SM.tif')
+SM <- getSoilMoistureContent(SoilMoistureDataSet, Weighting, slope)
 
-#Visualize Soil Moisture
+
+
+### Visualizations
+
+# Visualize Soil Moisture (raster)
+par(mfrow = (c(1,1)))
 colfunc1 <- colorRampPalette(c("white", "blue"))
-plot(SM, col=colfunc1(255))
-colfunc2 <- colorRampPalette(c("blue", "darkblue"))
+plot(SM, col=colfunc1(255), main="Soil moisture content",  
+     xlim=c((extent(DEM)[1]), (extent(DEM)[2])), ylim=c((extent(DEM)[3]), (extent(DEM)[4])))
 
+# Visualize of soil moisture is a point dataset
+rbPal <- colorRampPalette(c("white", "darkblue"))
+SoilMoistureDataSet$col <- rbPal(255)[as.numeric(cut(SoilMoistureDataSet$SM, breaks = 255))]
+plot(SoilMoistureDataSet[c("X", "Y")], pch=16, col=SoilMoistureDataSet$col,  
+     xlim=c((extent(DEM)[1]), (extent(DEM)[2])), ylim=c((extent(DEM)[3]), (extent(DEM)[4])),
+     main="Measured soil moisture content")
 
-values$soilmoisture <- data.frame(dataframe["DAILY_MEAN"])
-head(values)
-#Create a function to generate a continuous color palette
-rbPal <- colorRampPalette(c('red','blue'))
-head(values[1])
-#This adds a column of color values
-# based on the y values
-values$Col <- rbPal(10)[as.numeric(cut(values[1],breaks = 10))]
-points(dataframe, dataframe@DAILY_MEAN, ex=0.5,  pch=16, col=colfunc1(255), add=T)
+# Difference estimated and known SM
+source('Scripts/DifferentEst.R')
+EstimatedSMdf <- difEstReal(SM, SoilMoistureDataSet, prj_string)
+difference1 <- as.matrix(EstimatedSMdf$difference)
+rbPal <- colorRampPalette(c("red","yellow","green"))
+EstimatedSMdf$col <- rbPal(255)[as.numeric(cut(difference1, breaks = 255))]
+plot(EstimatedSMdf[c(2, 3)], pch=16, col=EstimatedSMdf$col,  
+     xlim=c((extent(DEM)[1]), (extent(DEM)[2])), ylim=c((extent(DEM)[3]), (extent(DEM)[4])),
+     main="Difference between estimated and measured SM")
 
-
-spplot(dataframe, "DAILY_MEAN", ex=0.5,  pch=16, col=colfunc2(10), add=T)
-dataframe[4]
-dataframe <- SpatialPointsDataFrame(SoilMoisturePoints, SoilMoistureDataFrame, proj4string=CRS(prj_string))
-EstimatedSM <- extract(SM, SoilMoisturePoints,  pch=16, sp=T)
-difference <- data.frame(EstimatedSM) - data.frame(dataframe["DAILY_MEAN"])
-
-dataframe["DAILY_MEAN"]
-?extract
-# for rasters take the pixel, and overlay

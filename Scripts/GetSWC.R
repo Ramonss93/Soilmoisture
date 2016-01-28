@@ -1,28 +1,20 @@
-getSoilMoistureContent <- function(SoilMoistureDataFrame, Weighting){
-	SoilMoistureDataFramexy <- empty dataframe
-	SoilMoistureDataFramexy$x <- SoilMoistureDataFrame["X"]
-	SoilMoistureDataFramexy$y <- SoilMoistureDataFrame["Y"]
-	SoilMoisturePoints <- SpatialPoints(SoilMoistureDataFramexy, proj4string=CRS(prj_string))
-	SoilMoistureDataFrame$Slope <- extract(slope, SoilMoisturePoints, pch=16)
-	SoilMoistureDataFrame
-	refSoilMoisture <- mean(SoilMoistureDataFrame$FIELD_4[SoilMoistureDataFrame["Slope"] == min(SoilMoistureDataFrame["Slope"])])
-	SM <-	Weighting*refSoilMoisture
-	return(SM1)
-}
-?SpatialPoints																	
-#points SM at a certain time (in certain format), three examples with fields X, Y, SM)
-SoilMoistureDataFrame <- read.csv('data/Wuest_all_mod.csv')
-SoilMoistureDataFrame <- read.csv('data/SM_points_all.csv')
-rasterSM <-  raster('data/MC-20130506-SM.tif')
-rasterSM <- projectRaster(rasterSM, crs=prj_string)
-#preprocess soil moisture
-rastercrop <- crop(rasterSMproj, DEM)
-rastercrop
-
-plot(Weighting)
-getSoilMoistureContent <- function(SoilMoistureDataFrame, Weighting){
-
-	SM <-	Weighting*rastercrop
-	
-	return(SM1)
+getSoilMoistureContent <- function(SoilMoistureDataSet, Weighting, slope, DEM){
+  
+  #calculate soil moisture values
+  #args: soil moisture dataset (point dataset or raster), weighting raster from Svetlitchnyi(raster), slope(raster), DEM(raster)
+  #output: downscaled soil moisture content map (raster)
+  
+	if (is.data.frame(SoilMoistureDataSet)){
+    SoilMoisturePoints <- SpatialPoints(SoilMoistureDataSet[c("X", "Y")], proj4string=CRS(prj_string))
+		SoilMoistureDataSet$Slope <- extract(slope, SoilMoisturePoints, pch=16)
+		SoilMoistureDataSet
+		refSoilMoisture <- mean(SoilMoistureDataSet$SM[SoilMoistureDataSet["Slope"] == min(SoilMoistureDataSet["Slope"])])
+		SM <-	Weighting*refSoilMoisture
+    return(SM)
+	} else {
+	  SoilMoistureDataSet <- crop(SoilMoistureDataSet, DEM, snap='near')
+	  resampledcrop <- resample(SoilMoistureDataSet, Weighting, method='ngb')
+		kw <- resampledcrop*Weighting
+		return(kw)
+		}
 }
