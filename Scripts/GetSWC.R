@@ -18,3 +18,4 @@ getSoilMoistureContent <- function(SoilMoistureDataSet, Weighting, slope, DEM){
 		return(kw)
 		}
 }
+?crop

@@ -4,7 +4,19 @@
 
 ### Title: Script for downscaling soil moisture based on a Digital elevation model
 
+### User requirements (go through these steps carefully):
+# 1. Should import a DEM (in this script two DEM's are given as example (uncomment one to see results))
+# 2. If projection DEM is unknown, give projection in format proj4
+# 3. Give soil moisture data (raster or points), three examples or given (uncomment one to see results)
+# 4. Last value to be set is the flow accumulation
+# 5. As R does not have a function for profile curvature choose one of the two examples
+
+# Output: 
+	#raster file with estimated soil moisture content with this downscaling approach
+	#table with differences between point measurements and estimated soil moisture
+
 ### Libraries
+library(dynatopmodel)
 library(raster)
 library(rgdal)
 library(sp)
@@ -14,24 +26,15 @@ library(graphics)
 rm(list = ls())
 
 # Set working directory
-path = "C:/Users/gebruiker/Documents/Downscaling_script/"
+path = "/home/user/git/ScriptingProject/Downscaling_script/"
 setwd(path)
 
-
-### User requirements (go through these steps):
-      # 1. Should import a DEM (in this script two DEM's are given as example (uncomment one to see results))
-      # 2. If projection DEM is unknown, give projection in format proj4
-      # 3. Give soil moisture data (raster or points), three examples or given (uncomment one to see results)
-      # 4. Last value to be set is the flow accumulation
-      # 5. As R does not have a function for profile curvature choose one of the two examples
-      
-
 #1. import DEM
-DEM <- raster('data/tarrawar.asc')
-#DEM <- raster('data/dem5wuest.asc')
+inputraster <- 'data/tarrawar.asc'
+#inputraster <- 'data/dem5wuest.asc'
+DEM <- raster(inputraster)
 
-
-#if projection is unknown, set here projection
+#2. if projection is unknown, set here projection
 prj_string <- "+proj=tmerc +lat_0=0 +lon_0=6 +k=1 +x_0=2500000 +y_0=0 +ellps=bessel +datum=potsdam +units=m +no_defs +towgs84=598.1,73.7,418.2,0.202,0.045,-2.455,6.7"
 source('Scripts/projection.R')
 DEM <- projectinput(DEM, prj_string)
@@ -39,8 +42,9 @@ DEM <- projectinput(DEM, prj_string)
 plot(DEM, main="Digital elevation model", col=topo.colors(255))
 
 # 3. Soil moisture data (raster or points)
-SoilMoistureDataSet <- read.csv('data/SoilMoisturetarra.csv')
-#SoilMoistureDataSet <- read.csv('data/SoilMoistureWuest.csv', sep=",")
+inputfile = 'data/SoilMoisturetarra.csv'
+#inputfile = 'data/SoilMoistureWuest.csv'
+SoilMoistureDataSet <- read.csv(inputfile, sep=",")
 #SoilMoistureDataSet <-  projectRaster(raster('data/MC-20130429-SM.tif'),crs=prj_string)
 
 # 4. relative distance to channel
@@ -54,7 +58,7 @@ aspect <- terrain(DEM, opt='aspect', unit='degrees', neighbors = 8)
 # slope map
 slope <- terrain(DEM, opt='slope', unit='degrees', neighbors = 8)
 
-# profile curvature
+# 5. profile curvature
 profileCurv <-  raster('data/Tar_profcurv.tif')
 #profileCurv <-  raster('data/Wuest_prcurv.tif')
 #not working function for profile curvature:
@@ -90,10 +94,8 @@ plot(profileCurv, col=colfunc(255),main="Profile curvature")
 
 source('Scripts/WeightingRaster.R')
 Weighting <- getWeightingRaster(aspect, slope, profileCurv, lrel)
-
 source('Scripts/GetSWC.R')
-SM <- getSoilMoistureContent(SoilMoistureDataSet, Weighting, slope)
-
+SM <- getSoilMoistureContent(SoilMoistureDataSet, Weighting, slope, DEM)
 
 
 ### Visualizations
@@ -104,7 +106,7 @@ colfunc1 <- colorRampPalette(c("white", "blue"))
 plot(SM, col=colfunc1(255), main="Soil moisture content",  
      xlim=c((extent(DEM)[1]), (extent(DEM)[2])), ylim=c((extent(DEM)[3]), (extent(DEM)[4])))
 
-# Visualize of soil moisture is a point dataset
+# Visualize if soil moisture is a point dataset
 rbPal <- colorRampPalette(c("white", "darkblue"))
 SoilMoistureDataSet$col <- rbPal(255)[as.numeric(cut(SoilMoistureDataSet$SM, breaks = 255))]
 plot(SoilMoistureDataSet[c("X", "Y")], pch=16, col=SoilMoistureDataSet$col,  
@@ -121,3 +123,7 @@ plot(EstimatedSMdf[c(2, 3)], pch=16, col=EstimatedSMdf$col,
      xlim=c((extent(DEM)[1]), (extent(DEM)[2])), ylim=c((extent(DEM)[3]), (extent(DEM)[4])),
      main="Difference between estimated and measured SM")
 
+
+### writing to output
+writeRaster(SM, filename='output/SoilMoisture.tif')
+write.csv(EstimatedSMdf, file='output/SM_difference.csv')
